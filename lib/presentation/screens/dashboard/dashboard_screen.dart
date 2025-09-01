@@ -191,6 +191,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                       progress: savingsProgress,
                     ),
 
+                  const SizedBox(height: 20),
+
                   // 5. Recent Transactions
                   AnimatedSectionTitle(title: "Recent Transactions"),
                   const SizedBox(height: 12),
@@ -228,42 +230,71 @@ class AnimatedProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String name = user.displayName ?? user.email ?? "User";
+    final String firstLetter = name.isNotEmpty ? name[0].toUpperCase() : "?";
+
     return TweenAnimationBuilder<double>(
       duration: const Duration(milliseconds: 600),
       tween: Tween(begin: 0.0, end: 1.0),
-      curve: Curves.easeOut,
+      curve: Curves.easeOutCubic,
       builder: (context, value, child) {
         return Opacity(
           opacity: value,
           child: Transform.translate(
             offset: Offset(0, (1 - value) * 20),
             child: Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              elevation: 4,
+              elevation: 6,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              shadowColor: Colors.blue.withOpacity(0.2),
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.all(18.0),
                 child: Row(
                   children: [
+                    // Avatar with first letter
                     CircleAvatar(
-                      radius: 28,
-                      backgroundColor: Colors.blue.shade100,
-                      child: const Icon(Icons.person, size: 30, color: Colors.blue),
+                      radius: 30,
+                      backgroundColor: Colors.blue.shade600,
+                      child: Text(
+                        firstLetter,
+                        style: const TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 14),
+                    // User Info
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             "Welcome back,",
-                            style: Theme.of(context).textTheme.bodySmall,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w400,
+                              color: Colors.black,
+                            ),
                           ),
                           Text(
-                            user.displayName ?? user.email ?? "User",
-                            style: Theme.of(context).textTheme.titleMedium,
+                            name ,
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
-                          Text("Currency: ${user.currency ?? 'PKR'}"),
+                          const SizedBox(height: 2),
+                          Text(
+                            "Currency: ${user.currency ?? 'PKR'}",
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -277,7 +308,6 @@ class AnimatedProfileCard extends StatelessWidget {
     );
   }
 }
-
 // Animated Dashboard Card
 class AnimatedDashboardCard extends StatelessWidget {
   final String title;
@@ -303,14 +333,17 @@ class AnimatedDashboardCard extends StatelessWidget {
       duration: const Duration(milliseconds: 500),
       tween: Tween(begin: 0.0, end: 1.0),
       curve: Curves.easeOut,
-      builder: (context, value, child) {
+      builder: (context, animValue, child) {
         return Opacity(
-          opacity: value,
+          opacity: animValue,
           child: Transform.scale(
-            scale: 0.95 + (value * 0.05),
+            scale: 0.95 + (animValue * 0.05),
             child: Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              elevation: 6,
+              shadowColor: color.withOpacity(0.3),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
@@ -322,8 +355,8 @@ class AnimatedDashboardCard extends StatelessWidget {
                       children: [
                         CircleAvatar(
                           radius: 20,
-                          backgroundColor: color.withOpacity(0.2),
-                          child: Icon(icon, color: color, size: 18),
+                          backgroundColor: color.withOpacity(0.15),
+                          child: Icon(icon, color: color, size: 20),
                         ),
                         if (showEdit)
                           IconButton(
@@ -333,24 +366,24 @@ class AnimatedDashboardCard extends StatelessWidget {
                           ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey,
+                      value,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    // Text(
-                    //   value,
-                    //   style: const TextStyle(
-                    //     fontSize: 18,
-                    //     fontWeight: FontWeight.bold,
-                    //   ),
-                    //   overflow: TextOverflow.ellipsis,
-                    // ),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -361,6 +394,7 @@ class AnimatedDashboardCard extends StatelessWidget {
     );
   }
 }
+
 
 // Animated Quick Actions
 class AnimatedQuickActions extends StatelessWidget {
@@ -385,37 +419,24 @@ class AnimatedQuickActions extends StatelessWidget {
       ),
       itemCount: actions.length,
       itemBuilder: (context, index) {
-        return TweenAnimationBuilder<double>(
-          duration: Duration(milliseconds: 400 + (index * 100)),
-          tween: Tween(begin: 0.0, end: 1.0),
-          curve: Curves.easeOutBack,
-          builder: (context, value, child) {
-            return Opacity(
-              opacity: value,
-              child: Transform.scale(
-                scale: value,
-                child: Column(
-                  children: [
-                    CircleAvatar(
-                      radius: 28,
-                      backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-                      child: Icon(
-                        actions[index]['icon'],
-                        size: 24,
-                        color: Theme.of(context).primaryColor,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      actions[index]['label'],
-                      style: const TextStyle(fontSize: 12),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
+        return Column(
+          children: [
+            CircleAvatar(
+              radius: 28,
+              backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+              child: Icon(
+                actions[index]['icon'],
+                size: 24,
+                color: Theme.of(context).primaryColor,
               ),
-            );
-          },
+            ),
+            const SizedBox(height: 6),
+            Text(
+              actions[index]['label'],
+              style: const TextStyle(fontSize: 12),
+              textAlign: TextAlign.center,
+            ),
+          ],
         );
       },
     );
@@ -446,28 +467,36 @@ class AnimatedSavingsProgressCard extends StatelessWidget {
       builder: (context, value, child) {
         return Card(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: 4, // slight shadow for a professional look
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
               children: [
                 // Circular Progress Indicator
                 SizedBox(
-                  width: 80,
-                  height: 80,
+                  width: 100,
+                  height: 100,
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      CircularProgressIndicator(
-                        value: value,
-                        strokeWidth: 8,
-                        color: value >= 1.0 ? Colors.green : Colors.blue,
-                        backgroundColor: Colors.grey.shade300,
+                      SizedBox(
+                        width: 90,
+                        height: 90,
+                        child: CircularProgressIndicator(
+                          value: value, // between 0 and 1
+                          strokeWidth: 10,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            value >= 1.0 ? Colors.green : Colors.blue,
+                          ),
+                          backgroundColor: Colors.grey.shade300,
+                        ),
                       ),
                       Text(
-                        "${(value * 100).toStringAsFixed(0)}%",
+                        "${(value * 100).toStringAsFixed(0)}",
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
+                          color: Colors.black,
                         ),
                       ),
                     ],
@@ -493,11 +522,15 @@ class AnimatedSavingsProgressCard extends StatelessWidget {
                           color: Colors.grey.shade600,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      LinearProgressIndicator(
-                        value: value,
-                        color: value >= 1.0 ? Colors.green : Colors.blue,
-                        backgroundColor: Colors.grey.shade200,
+                      const SizedBox(height: 12),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          value: value,
+                          minHeight: 8,
+                          color: value >= 1.0 ? Colors.green : Colors.blue,
+                          backgroundColor: Colors.grey.shade200,
+                        ),
                       ),
                     ],
                   ),
@@ -509,7 +542,9 @@ class AnimatedSavingsProgressCard extends StatelessWidget {
       },
     );
   }
+
 }
+
 
 // Animated Section Title
 class AnimatedSectionTitle extends StatelessWidget {
