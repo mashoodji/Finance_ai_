@@ -1,3 +1,4 @@
+// lib/data/repository/transaction_repository.dart
 import '../models/transactions_model.dart';
 import '../services/firestore_service.dart';
 
@@ -14,6 +15,6 @@ class TransactionRepository {
   Future<void> updateTransaction(TransactionModel transaction) =>
       firestoreService.updateTransaction(transaction);
 
-  Future<void> deleteTransaction(String id) =>
-      firestoreService.deleteTransaction(id);
+  Future<void> deleteTransaction(String userId, String id) =>
+      firestoreService.deleteTransaction(userId, id);
 }

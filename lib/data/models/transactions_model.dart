@@ -1,3 +1,4 @@
+// lib/data/models/transaction_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum TransactionType { income, expense }
@@ -28,7 +29,7 @@ class TransactionModel {
       'amount': amount,
       'category': category,
       'date': Timestamp.fromDate(date),
-      'type': type.toString().split('.').last,
+      'type': type == TransactionType.income ? 'income' : 'expense', // Fixed this line
       'notes': notes,
     };
   }

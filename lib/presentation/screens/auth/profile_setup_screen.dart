@@ -24,8 +24,8 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   final _savingsGoal = TextEditingController();
 
   String _currency = "PKR";
-  String _financialGoal = "Wealth Building";
-  String _riskTolerance = "Moderate";
+  // String _financialGoal = "Wealth Building";
+  // String _riskTolerance = "Moderate";
   bool _loading = false;
   bool _isEditingName = false;
   bool _notificationsEnabled = true;
@@ -66,8 +66,8 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
         _savingsGoal.text = user.monthlySavingsGoal!.toStringAsFixed(0);
       }
 
-      _financialGoal = user.financialGoal ?? "Wealth Building";
-      _riskTolerance = user.riskTolerance ?? "Moderate";
+      // _financialGoal = user.financialGoal ?? "Wealth Building";
+      // _riskTolerance = user.riskTolerance ?? "Moderate";
 
       setState(() {
         _dataLoaded = true;
@@ -97,8 +97,8 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
         phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
         monthlyBudget: _budget.text.trim().isEmpty ? null : num.tryParse(_budget.text.trim()),
         monthlySavingsGoal: _savingsGoal.text.trim().isEmpty ? null : num.tryParse(_savingsGoal.text.trim()),
-        financialGoal: _financialGoal,
-        riskTolerance: _riskTolerance,
+        // financialGoal: _financialGoal,
+        // riskTolerance: _riskTolerance,
       );
 
       if (mounted) {
@@ -539,6 +539,59 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                           // Personal Information Section
                           _buildSectionHeader(Icons.person_outline, 'Personal Information'),
 
+                          // Display User Email (Read-only)
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        AppColors.primary.withOpacity(0.1),
+                                        AppColors.secondary.withOpacity(0.05),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.email, color: AppColors.primary),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        "Email Address",
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        email,
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
                           _isEditingName
                               ? TextFormField(
                             controller: _name,
@@ -620,10 +673,10 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                                         ),
                                       ),
                                       const SizedBox(height: 4),
-                                      Text(
-                                        email,
+                                      const Text(
+                                        "Display Name",
                                         style: TextStyle(
-                                          color: Colors.grey[600],
+                                          color: Colors.grey,
                                           fontSize: 12,
                                         ),
                                       ),

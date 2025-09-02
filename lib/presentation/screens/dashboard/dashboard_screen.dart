@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/animation.dart';
-import 'dart:math';
+import '../../../data/models/transactions_model.dart';
 import '../../../data/models/user_models.dart';
 import '../../../state/auth_provider.dart';
+import '../../../state/expense_provider.dart';
 import '../auth/login_screen.dart';
 import '../auth/profile_setup_screen.dart';
+import '../expense/add_edit_transaction_screen.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   static const routePath = '/dashboard';
@@ -53,10 +55,28 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
     super.dispose();
   }
 
+  // Helper function to get icon based on category
+  IconData _getCategoryIcon(String category) {
+    switch (category.toLowerCase()) {
+      case 'food': return Icons.restaurant;
+      case 'transport': return Icons.directions_car;
+      case 'entertainment': return Icons.movie;
+      case 'shopping': return Icons.shopping_cart;
+      case 'healthcare': return Icons.local_hospital;
+      case 'education': return Icons.school;
+      case 'utilities': return Icons.bolt;
+      case 'salary': return Icons.work;
+      case 'freelance': return Icons.computer;
+      case 'investment': return Icons.trending_up;
+      default: return Icons.money;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final userAsync = ref.watch(authControllerProvider);
     final user = userAsync.value;
+    final transactions = ref.watch(transactionProvider);
 
     // Convert num to double and handle null values
     final monthlyIncome = (user?.monthlyIncome ?? 0).toDouble();
@@ -68,6 +88,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
     final savingsProgress = monthlySavingsGoal > 0
         ? (monthlyBudget > 0 ? (monthlyBudget / monthlySavingsGoal).clamp(0.0, 1.0) : 0.0)
         : 0.0;
+
+    final recentTransactions = transactions.take(5).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -194,11 +216,34 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                   const SizedBox(height: 20),
 
                   // 5. Recent Transactions
-                  AnimatedSectionTitle(title: "Recent Transactions"),
+                  const AnimatedSectionTitle(title: "Recent Transactions"),
                   const SizedBox(height: 12),
-                  const AnimatedTransactionTile(icon: Icons.shopping_cart, label: "Grocery", amount: "-\$120", color: Colors.orange),
-                  const AnimatedTransactionTile(icon: Icons.local_gas_station, label: "Fuel", amount: "-\$50", color: Colors.red),
-                  const AnimatedTransactionTile(icon: Icons.work, label: "Salary", amount: "+\$2,000", color: Colors.green),
+
+                  if (recentTransactions.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text("No transactions yet. Add your first transaction!"),
+                    )
+                  else
+                    ...recentTransactions.map((transaction) =>
+                        AnimatedTransactionTile(
+                          icon: _getCategoryIcon(transaction.category),
+                          label: transaction.category,
+                          amount: '${transaction.type == TransactionType.income ? '+' : '-'}\$${transaction.amount.toStringAsFixed(2)}',
+                          color: transaction.type == TransactionType.income ? Colors.green : Colors.red,
+                        )
+                    ),
+
+                  if (transactions.isNotEmpty)
+                    Center(
+                      child: TextButton(
+                        onPressed: () {
+                          // Navigate to transactions list screen
+                        },
+                        child: const Text('View All Transactions'),
+                      ),
+                    ),
+
                   const SizedBox(height: 24),
 
                   // 6. Financial Health Indicator
@@ -211,7 +256,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
 
                   // 7. Setup Prompt if data is missing
                   if (monthlyIncome == 0 || monthlyBudget == 0)
-                    AnimatedSetupPrompt(),
+                    const AnimatedSetupPrompt(),
                 ],
               ),
             ),
@@ -280,7 +325,7 @@ class AnimatedProfileCard extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            name ,
+                            name,
                             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: Colors.black87,
@@ -308,6 +353,7 @@ class AnimatedProfileCard extends StatelessWidget {
     );
   }
 }
+
 // Animated Dashboard Card
 class AnimatedDashboardCard extends StatelessWidget {
   final String title;
@@ -395,8 +441,7 @@ class AnimatedDashboardCard extends StatelessWidget {
   }
 }
 
-
-// Animated Quick Actions
+// Update the AnimatedQuickActions to navigate to Add Transaction screen
 class AnimatedQuickActions extends StatelessWidget {
   final List<Map<String, dynamic>> actions = const [
     {'icon': Icons.add, 'label': 'Add Expense'},
@@ -419,24 +464,38 @@ class AnimatedQuickActions extends StatelessWidget {
       ),
       itemCount: actions.length,
       itemBuilder: (context, index) {
-        return Column(
-          children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-              child: Icon(
-                actions[index]['icon'],
-                size: 24,
-                color: Theme.of(context).primaryColor,
+        return GestureDetector(
+          onTap: () {
+            if (index == 0 || index == 1) {
+              // Navigate to add transaction screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AddEditTransactionScreen(),
+                ),
+              );
+            }
+            // Handle other actions
+          },
+          child: Column(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                child: Icon(
+                  actions[index]['icon'],
+                  size: 24,
+                  color: Theme.of(context).primaryColor,
+                ),
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              actions[index]['label'],
-              style: const TextStyle(fontSize: 12),
-              textAlign: TextAlign.center,
-            ),
-          ],
+              const SizedBox(height: 6),
+              Text(
+                actions[index]['label'],
+                style: const TextStyle(fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         );
       },
     );
@@ -467,7 +526,7 @@ class AnimatedSavingsProgressCard extends StatelessWidget {
       builder: (context, value, child) {
         return Card(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          elevation: 4, // slight shadow for a professional look
+          elevation: 4,
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
@@ -483,7 +542,7 @@ class AnimatedSavingsProgressCard extends StatelessWidget {
                         width: 90,
                         height: 90,
                         child: CircularProgressIndicator(
-                          value: value, // between 0 and 1
+                          value: value,
                           strokeWidth: 10,
                           valueColor: AlwaysStoppedAnimation<Color>(
                             value >= 1.0 ? Colors.green : Colors.blue,
@@ -492,7 +551,7 @@ class AnimatedSavingsProgressCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        "${(value * 100).toStringAsFixed(0)}",
+                        "${(value * 100).toStringAsFixed(0)}%",
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
@@ -542,9 +601,7 @@ class AnimatedSavingsProgressCard extends StatelessWidget {
       },
     );
   }
-
 }
-
 
 // Animated Section Title
 class AnimatedSectionTitle extends StatelessWidget {
