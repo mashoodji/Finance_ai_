@@ -1,8 +1,8 @@
-// lib/presentation/screens/expense/add_edit_transaction_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../data/models/transactions_model.dart';
+import '../../../../data/models/user_models.dart';
 import '../../../../state/auth_provider.dart';
 import '../../../../state/expense_provider.dart';
 
@@ -23,14 +23,32 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
   final _notesController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
   TransactionType _selectedType = TransactionType.expense;
-  final List<String> _categories = [
+  String _selectedCurrency = 'PKR'; // Default currency
+
+  final List<String> _incomeCategories = [
+    'Salary', 'Freelance', 'Investment', 'Business', 'Gift', 'Other Income'
+  ];
+
+  final List<String> _expenseCategories = [
     'Food', 'Transport', 'Entertainment', 'Shopping',
-    'Health', 'Education', 'Salary', 'Freelance', 'Investment', 'Other'
+    'Healthcare', 'Education', 'Utilities', 'Rent', 'Bills', 'Other Expenses'
+  ];
+
+  // List of supported currencies
+  final List<String> _currencies = [
+    'PKR', 'USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CNY', 'INR', 'AED'
   ];
 
   @override
   void initState() {
     super.initState();
+
+    // Load user data to get currency preference
+    final user = ref.read(authControllerProvider).value;
+    if (user != null && user.currency != null) {
+      _selectedCurrency = user.currency!;
+    }
+
     if (widget.transaction != null) {
       _amountController.text = widget.transaction!.amount.toString();
       _categoryController.text = widget.transaction!.category;
@@ -62,15 +80,29 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
     }
   }
 
+  String _getFinancialImpactMessage(double amount) {
+    if (_selectedType == TransactionType.income) {
+      return "💵 Adding $_selectedCurrency ${amount.toStringAsFixed(2)} to your monthly income";
+    } else {
+      return "💸 Adding $_selectedCurrency ${amount.toStringAsFixed(2)} to your expenses";
+    }
+  }
+
+  List<String> _getAvailableCategories() {
+    return _selectedType == TransactionType.income ? _incomeCategories : _expenseCategories;
+  }
+
   Future<void> _saveTransaction() async {
     if (_formKey.currentState!.validate()) {
-      final user = ref.read(authControllerProvider).value;
+      final userAsync = ref.read(authControllerProvider);
+      final user = userAsync.value;
       if (user == null) return;
 
+      final amount = double.parse(_amountController.text);
       final transaction = TransactionModel(
         id: widget.transaction?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
         userId: user.uid,
-        amount: double.parse(_amountController.text),
+        amount: amount,
         category: _categoryController.text,
         date: _selectedDate,
         type: _selectedType,
@@ -79,16 +111,45 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
 
       try {
         if (widget.transaction == null) {
+          // Add new transaction
           await ref.read(transactionProvider.notifier).addTransaction(transaction);
+
+          // If it's an income transaction, update user's monthly income
+          if (_selectedType == TransactionType.income) {
+            final newMonthlyIncome = (user.monthlyIncome ?? 0) + amount;
+
+            // Update user's monthly income and adjust budget if needed
+            await ref.read(authControllerProvider.notifier).updateUser(
+              user.copyWith(
+                monthlyIncome: newMonthlyIncome,
+                // If no budget is set, automatically set it to 70% of the new income
+                monthlyBudget: user.monthlyBudget ?? newMonthlyIncome * 0.7,
+              ),
+            );
+          }
+
+          // Show financial impact message
+          final impactMessage = _getFinancialImpactMessage(amount);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(impactMessage),
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
         } else {
+          // Update existing transaction
           await ref.read(transactionProvider.notifier).updateTransaction(transaction);
         }
 
         if (mounted) {
           Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Transaction ${widget.transaction == null ? 'added' : 'updated'} successfully')),
-          );
+          if (widget.transaction != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Transaction updated successfully')),
+            );
+          }
         }
       } catch (e) {
         if (mounted) {
@@ -102,6 +163,10 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
 
   @override
   Widget build(BuildContext context) {
+    final amount = double.tryParse(_amountController.text) ?? 0;
+    final financialImpact = _getFinancialImpactMessage(amount);
+    final availableCategories = _getAvailableCategories();
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.transaction == null ? 'Add Transaction' : 'Edit Transaction'),
@@ -162,9 +227,11 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                     child: ChoiceChip(
                       label: const Text('Expense'),
                       selected: _selectedType == TransactionType.expense,
+                      selectedColor: Colors.red,
                       onSelected: (selected) {
                         setState(() {
                           _selectedType = TransactionType.expense;
+                          _categoryController.text = '';
                         });
                       },
                     ),
@@ -174,9 +241,11 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                     child: ChoiceChip(
                       label: const Text('Income'),
                       selected: _selectedType == TransactionType.income,
+                      selectedColor: Colors.green,
                       onSelected: (selected) {
                         setState(() {
                           _selectedType = TransactionType.income;
+                          _categoryController.text = '';
                         });
                       },
                     ),
@@ -185,21 +254,56 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
               ),
               const SizedBox(height: 20),
 
+              // Currency Dropdown
+              DropdownButtonFormField<String>(
+                value: _selectedCurrency,
+                decoration: const InputDecoration(
+                  labelText: 'Currency',
+                  border: OutlineInputBorder(),
+                ),
+                items: _currencies.map((currency) {
+                  return DropdownMenuItem<String>(
+                    value: currency,
+                    child: Text(currency),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedCurrency = value!;
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
+
               // Amount
               TextFormField(
                 controller: _amountController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Amount',
-                  prefixText: '\$ ',
-                  border: OutlineInputBorder(),
+                  prefixText: '$_selectedCurrency ',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: _amountController.text.isNotEmpty
+                      ? IconButton(
+                    icon: const Icon(Icons.calculate),
+                    onPressed: () {
+                      setState(() {}); // Recalculate impact
+                    },
+                  )
+                      : null,
                 ),
+                onChanged: (value) {
+                  setState(() {}); // Update financial impact in real-time
+                },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter an amount';
                   }
                   if (double.tryParse(value) == null) {
                     return 'Please enter a valid number';
+                  }
+                  if (double.parse(value) <= 0) {
+                    return 'Amount must be greater than 0';
                   }
                   return null;
                 },
@@ -213,7 +317,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                   labelText: 'Category',
                   border: OutlineInputBorder(),
                 ),
-                items: _categories.map((category) {
+                items: availableCategories.map((category) {
                   return DropdownMenuItem<String>(
                     value: category,
                     child: Text(category),
@@ -261,15 +365,58 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                 ),
                 maxLines: 3,
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+
+              // Financial Impact Preview
+              if (_amountController.text.isNotEmpty && amount > 0)
+                Card(
+                  color: _selectedType == TransactionType.income
+                      ? Colors.green.shade50
+                      : Colors.orange.shade50,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Financial Impact:",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          financialImpact,
+                          style: TextStyle(
+                            color: _selectedType == TransactionType.income
+                                ? Colors.green.shade800
+                                : Colors.orange.shade800,
+                          ),
+                        ),
+                        if (_selectedType == TransactionType.income)
+                          const SizedBox(height: 8),
+                        if (_selectedType == TransactionType.income)
+                          const Text(
+                            "Your monthly income will be updated automatically",
+                            style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 20),
 
               // Save Button
               ElevatedButton(
                 onPressed: _saveTransaction,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor: _selectedType == TransactionType.income
+                      ? Colors.green
+                      : Colors.blue,
                 ),
-                child: Text(widget.transaction == null ? 'Add Transaction' : 'Update Transaction'),
+                child: Text(
+                  widget.transaction == null ? 'Add Transaction' : 'Update Transaction',
+                  style: const TextStyle(color: Colors.white),
+                ),
               ),
             ],
           ),

@@ -1,4 +1,4 @@
-// lib/data/models/transaction_model.dart
+// lib/data/models/transactions_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum TransactionType { income, expense }
@@ -11,6 +11,8 @@ class TransactionModel {
   final DateTime date;
   final TransactionType type;
   final String? notes;
+  final int month; // Added for monthly tracking
+  final int year;  // Added for yearly tracking
 
   TransactionModel({
     required this.id,
@@ -20,7 +22,8 @@ class TransactionModel {
     required this.date,
     required this.type,
     this.notes,
-  });
+  }) : month = date.month,
+        year = date.year;
 
   Map<String, dynamic> toMap() {
     return {
@@ -29,8 +32,10 @@ class TransactionModel {
       'amount': amount,
       'category': category,
       'date': Timestamp.fromDate(date),
-      'type': type == TransactionType.income ? 'income' : 'expense', // Fixed this line
+      'type': type == TransactionType.income ? 'income' : 'expense',
       'notes': notes,
+      'month': month,
+      'year': year,
     };
   }
 

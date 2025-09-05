@@ -6,10 +6,10 @@ class AppUser {
   final String? displayName;
   final String? photoURL;
   final String currency;
-  final num monthlyIncome;
+  final double monthlyIncome;
   final String? phone;
-  final num? monthlyBudget;
-  final num? monthlySavingsGoal;
+  final double? monthlyBudget;
+  final double? monthlySavingsGoal;
   final String? financialGoal;
   final String? riskTolerance;
   final DateTime? createdAt;
@@ -56,10 +56,10 @@ class AppUser {
       displayName: map['displayName'],
       photoURL: map['photoURL'],
       currency: map['currency'] ?? 'USD',
-      monthlyIncome: map['monthlyIncome'] ?? 0,
+      monthlyIncome: (map['monthlyIncome'] as num?)?.toDouble() ?? 0.0,
       phone: map['phone'],
-      monthlyBudget: map['monthlyBudget'],
-      monthlySavingsGoal: map['monthlySavingsGoal'],
+      monthlyBudget: (map['monthlyBudget'] as num?)?.toDouble(),
+      monthlySavingsGoal: (map['monthlySavingsGoal'] as num?)?.toDouble(),
       financialGoal: map['financialGoal'],
       riskTolerance: map['riskTolerance'],
       createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
@@ -67,15 +67,16 @@ class AppUser {
     );
   }
 
+
   AppUser copyWith({
     String? email,
     String? displayName,
     String? photoURL,
     String? currency,
-    num? monthlyIncome,
+    double? monthlyIncome,
     String? phone,
-    num? monthlyBudget,
-    num? monthlySavingsGoal,
+    double? monthlyBudget,
+    double? monthlySavingsGoal,
     String? financialGoal,
     String? riskTolerance,
     DateTime? createdAt,

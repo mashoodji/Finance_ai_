@@ -109,7 +109,30 @@ class AuthController extends StateNotifier<AsyncValue<AppUser?>> {
     }
   }
 
-  // NEW: Added reloadUser method
+  /// ✅ New method: Update full user object (for your AddEditTransactionScreen)
+  Future<void> updateUser(AppUser updatedUser) async {
+    try {
+      await ref.read(authRepositoryProvider).updateProfile(
+        uid: updatedUser.uid,
+        displayName: updatedUser.displayName ?? '',
+        currency: updatedUser.currency ?? 'PKR',
+        monthlyIncome: updatedUser.monthlyIncome,
+        phone: updatedUser.phone,
+        monthlyBudget: updatedUser.monthlyBudget,
+        monthlySavingsGoal: updatedUser.monthlySavingsGoal,
+        financialGoal: updatedUser.financialGoal,
+        riskTolerance: updatedUser.riskTolerance,
+      );
+
+      // Refresh state so UI reflects the new data
+      state = AsyncValue.data(updatedUser);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
+  // Reload user from Firestore
   Future<void> reloadUser() async {
     final currentUser = ref.read(authRepositoryProvider).currentUser;
     if (currentUser == null) {

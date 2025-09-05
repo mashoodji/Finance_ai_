@@ -8,6 +8,8 @@ import '../../../state/expense_provider.dart';
 import '../auth/login_screen.dart';
 import '../auth/profile_setup_screen.dart';
 import '../expense/add_edit_transaction_screen.dart';
+import '../expense/expense_detail_screen.dart';
+import '../income/income_detailed_screen.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   static const routePath = '/dashboard';
@@ -72,30 +74,70 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
     }
   }
 
+  // Calculate monthly financial metrics from transactions
+  _MonthlyFinancials _calculateMonthlyFinancials(List<TransactionModel> transactions, AppUser user) {
+    final now = DateTime.now();
+    final currentMonth = now.month;
+    final currentYear = now.year;
+
+    double totalIncome = 0;
+    double totalExpenses = 0;
+
+    for (var transaction in transactions) {
+      if (transaction.month == currentMonth && transaction.year == currentYear) {
+        if (transaction.type == TransactionType.income) {
+          totalIncome += transaction.amount;
+        } else {
+          totalExpenses += transaction.amount;
+        }
+      }
+    }
+
+    // ✅ Use 0.0 instead of 0 to maintain double type
+    final userBudget = user.monthlyBudget ?? 0.0;
+    final monthlyIncome = user.monthlyIncome; // Already double, no need to convert
+    final monthlySavingsGoal = user.monthlySavingsGoal ?? 0.0;
+
+    // ✅ Default to 70% of income if no budget set
+    final monthlyBudget = userBudget > 0 ? userBudget : totalIncome * 0.7;
+
+    final actualIncome = monthlyIncome > 0 ? monthlyIncome : totalIncome;
+    final actualSavings = actualIncome - totalExpenses;
+    final savingsProgress = monthlySavingsGoal > 0
+        ? (actualSavings / monthlySavingsGoal).clamp(0.0, 1.0)
+        : 0.0;
+
+    final budgetUsage = monthlyBudget > 0 ? (totalExpenses / monthlyBudget) : 0;
+
+    return _MonthlyFinancials(
+      income: actualIncome.toDouble(),
+      expenses: totalExpenses.toDouble(),
+      budget: monthlyBudget.toDouble(),
+      savingsGoal: monthlySavingsGoal.toDouble(),
+      savings: actualSavings.toDouble(),
+      savingsProgress: savingsProgress.toDouble(),
+      budgetUsage: budgetUsage.toDouble(),
+    );
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final userAsync = ref.watch(authControllerProvider);
     final user = userAsync.value;
     final transactions = ref.watch(transactionProvider);
 
-    // Convert num to double and handle null values
-    final monthlyIncome = (user?.monthlyIncome ?? 0).toDouble();
-    final monthlyBudget = (user?.monthlyBudget ?? 0).toDouble();
-    final monthlySavingsGoal = (user?.monthlySavingsGoal ?? 0).toDouble();
-    final expenses = monthlyIncome > 0 && monthlyBudget > 0
-        ? monthlyIncome - monthlyBudget
-        : 0;
-    final savingsProgress = monthlySavingsGoal > 0
-        ? (monthlyBudget > 0 ? (monthlyBudget / monthlySavingsGoal).clamp(0.0, 1.0) : 0.0)
-        : 0.0;
+    if (user == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
+    final financials = _calculateMonthlyFinancials(transactions, user);
     final recentTransactions = transactions.take(5).toList();
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('FinanceAI Dashboard'),
         actions: [
-          // Profile Icon
           IconButton(
             icon: const Icon(Icons.account_circle, size: 28),
             onPressed: () {
@@ -105,7 +147,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
               );
             },
           ),
-          // Logout
           IconButton(
             onPressed: () async {
               await ref.read(authControllerProvider.notifier).signOut();
@@ -121,11 +162,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
         ],
       ),
 
-      body: user == null
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
+      body: RefreshIndicator(
         onRefresh: () async {
-          // Refresh user data using the new reloadUser method
           await ref.read(authControllerProvider.notifier).reloadUser();
         },
         child: FadeTransition(
@@ -136,11 +174,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
               padding: const EdgeInsets.all(16.0),
               child: ListView(
                 children: [
-                  // 1. Welcome & Profile Section
                   AnimatedProfileCard(user: user),
                   const SizedBox(height: 20),
 
-                  // 2. Financial Overview Grid
+                  // Budget Warning Banner
+                  if (financials.budgetUsage >= 0.8)
+                    _BudgetWarningBanner(
+                      budgetUsage: financials.budgetUsage,
+                      currency: user.currency ?? 'PKR',
+                    ),
+
+                  // Savings Goal Celebration
+                  if (financials.savings >= financials.savingsGoal && financials.savingsGoal > 0)
+                    _SavingsGoalCelebration(
+                      currency: user.currency ?? 'PKR',
+                      savings: financials.savings,
+                      goal: financials.savingsGoal,
+                    ),
+
                   GridView(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -153,10 +204,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                     children: [
                       AnimatedDashboardCard(
                         title: 'Monthly Income',
-                        value: '${user.currency ?? 'PKR'} ${monthlyIncome.toStringAsFixed(2)}',
+                        value: '${user.currency ?? 'PKR'} ${financials.income.toStringAsFixed(2)}',
                         icon: Icons.trending_up,
                         color: Colors.green,
-                        showEdit: monthlyIncome == 0,
+                        showEdit: financials.income == 0,
                         onEdit: () {
                           Navigator.pushReplacement(
                             context,
@@ -166,10 +217,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                       ),
                       AnimatedDashboardCard(
                         title: 'Monthly Budget',
-                        value: '${user.currency ?? 'PKR'} ${monthlyBudget.toStringAsFixed(2)}',
+                        value: '${user.currency ?? 'PKR'} ${financials.budget.toStringAsFixed(2)}',
                         icon: Icons.pie_chart,
                         color: Colors.blue,
-                        showEdit: monthlyBudget == 0,
+                        showEdit: financials.budget == 0,
                         onEdit: () {
                           Navigator.pushReplacement(
                             context,
@@ -179,43 +230,39 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                       ),
                       AnimatedDashboardCard(
                         title: 'Monthly Expenses',
-                        value: '${user.currency ?? 'PKR'} ${expenses.toStringAsFixed(2)}',
+                        value: '${user.currency ?? 'PKR'} ${financials.expenses.toStringAsFixed(2)}',
                         icon: Icons.trending_down,
-                        color: expenses > 0 ? Colors.redAccent : Colors.grey,
+                        color: financials.expenses > 0 ? Colors.redAccent : Colors.grey,
+                        subtitle: financials.budget > 0
+                            ? '${(financials.budgetUsage * 100).toStringAsFixed(0)}% of budget'
+                            : null,
                       ),
                       AnimatedDashboardCard(
-                        title: 'Savings Goal',
-                        value: '${user.currency ?? 'PKR'} ${monthlySavingsGoal.toStringAsFixed(2)}',
+                        title: 'Current Savings',
+                        value: '${user.currency ?? 'PKR'} ${financials.savings.toStringAsFixed(2)}',
                         icon: Icons.savings,
-                        color: Colors.teal,
-                        showEdit: monthlySavingsGoal == 0,
-                        onEdit: () {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(builder: (context) => const ProfileSetupScreen()),
-                          );
-                        },
+                        color: financials.savings >= 0 ? Colors.teal : Colors.red,
+                        subtitle: financials.savingsGoal > 0
+                            ? '${(financials.savingsProgress * 100).toStringAsFixed(0)}% of goal'
+                            : null,
                       ),
                     ],
                   ),
                   const SizedBox(height: 24),
 
-                  // 3. Quick Actions
                   AnimatedQuickActions(),
                   const SizedBox(height: 24),
 
-                  // 4. Financial Goals Progress with Circular Chart
-                  if (monthlySavingsGoal > 0)
+                  if (financials.savingsGoal > 0)
                     AnimatedSavingsProgressCard(
                       currency: user.currency ?? 'PKR',
-                      current: monthlyBudget,
-                      goal: monthlySavingsGoal,
-                      progress: savingsProgress,
+                      current: financials.savings,
+                      goal: financials.savingsGoal,
+                      progress: financials.savingsProgress,
                     ),
 
                   const SizedBox(height: 20),
 
-                  // 5. Recent Transactions
                   const AnimatedSectionTitle(title: "Recent Transactions"),
                   const SizedBox(height: 12),
 
@@ -229,7 +276,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                         AnimatedTransactionTile(
                           icon: _getCategoryIcon(transaction.category),
                           label: transaction.category,
-                          amount: '${transaction.type == TransactionType.income ? '+' : '-'}\$${transaction.amount.toStringAsFixed(2)}',
+                          amount: '${transaction.type == TransactionType.income ? '+' : '-'}${user.currency ?? 'PKR'} ${transaction.amount.toStringAsFixed(2)}',
                           color: transaction.type == TransactionType.income ? Colors.green : Colors.red,
                         )
                     ),
@@ -246,16 +293,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
 
                   const SizedBox(height: 24),
 
-                  // 6. Financial Health Indicator
                   AnimatedFinancialHealthCard(
-                    income: monthlyIncome,
-                    budget: monthlyBudget,
-                    savingsGoal: monthlySavingsGoal,
+                    income: financials.income,
+                    expenses: financials.expenses,
+                    budget: financials.budget,
+                    savingsGoal: financials.savingsGoal,
+                    savings: financials.savings,
                   ),
                   const SizedBox(height: 16),
 
-                  // 7. Setup Prompt if data is missing
-                  if (monthlyIncome == 0 || monthlyBudget == 0)
+                  if (financials.income == 0 || financials.budget == 0)
                     const AnimatedSetupPrompt(),
                 ],
               ),
@@ -263,6 +310,176 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
           ),
         ),
       ),
+    );
+  }
+}
+
+// Data class for monthly financials
+class _MonthlyFinancials {
+  final double income;
+  final double expenses;
+  final double budget;
+  final double savingsGoal;
+  final double savings;
+  final double savingsProgress;
+  final double budgetUsage;
+
+  _MonthlyFinancials({
+    required this.income,
+    required this.expenses,
+    required this.budget,
+    required this.savingsGoal,
+    required this.savings,
+    required this.savingsProgress,
+    required this.budgetUsage,
+  });
+}
+
+// Budget Warning Banner
+class _BudgetWarningBanner extends StatelessWidget {
+  final double budgetUsage;
+  final String currency;
+
+  const _BudgetWarningBanner({required this.budgetUsage, required this.currency});
+
+  @override
+  Widget build(BuildContext context) {
+    String message;
+    Color color;
+
+    if (budgetUsage >= 1.0) {
+      message = "You've exceeded your monthly budget!";
+      color = Colors.red;
+    } else if (budgetUsage >= 0.9) {
+      message = "You've used 90% of your budget. Be careful!";
+      color = Colors.orange;
+    } else {
+      message = "You've used ${(budgetUsage * 100).toStringAsFixed(0)}% of your budget";
+      color = Colors.amber;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        border: Border.all(color: color),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.warning, color: color),
+          const SizedBox(width: 8),
+          Expanded(child: Text(message, style: TextStyle(color: color))),
+        ],
+      ),
+    );
+  }
+}
+
+// Savings Goal Celebration
+class _SavingsGoalCelebration extends StatelessWidget {
+  final String currency;
+  final double savings;
+  final double goal;
+
+  const _SavingsGoalCelebration({required this.currency, required this.savings, required this.goal});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.green.withOpacity(0.1),
+        border: Border.all(color: Colors.green),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.celebration, color: Colors.green),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              "🎉 Congratulations! You've achieved your savings goal of $currency ${goal.toStringAsFixed(2)}",
+              style: const TextStyle(color: Colors.green),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Update Financial Health Card to include savings
+class AnimatedFinancialHealthCard extends StatelessWidget {
+  final double income;
+  final double expenses;
+  final double budget;
+  final double savingsGoal;
+  final double savings;
+
+  const AnimatedFinancialHealthCard({
+    super.key,
+    required this.income,
+    required this.expenses,
+    required this.budget,
+    required this.savingsGoal,
+    required this.savings,
+  });
+
+  Color _getFinancialHealthColor() {
+    if (income == 0 || budget == 0) return Colors.grey;
+    if (expenses > income) return Colors.red;
+    if (savingsGoal > 0 && savings >= savingsGoal) return Colors.green;
+    if (savings >= 0) return Colors.blue;
+    return Colors.orange;
+  }
+
+  IconData _getFinancialHealthIcon() {
+    if (income == 0 || budget == 0) return Icons.help;
+    if (expenses > income) return Icons.warning;
+    if (savingsGoal > 0 && savings >= savingsGoal) return Icons.celebration;
+    if (savings >= 0) return Icons.trending_up;
+    return Icons.trending_down;
+  }
+
+  String _getFinancialHealthMessage() {
+    if (income == 0 || budget == 0) return "Complete your profile to see financial health analysis";
+    if (expenses > income) return "Your expenses exceed your income. Consider adjusting your spending.";
+    if (savingsGoal > 0 && savings >= savingsGoal) return "Great job! You've achieved your savings goal.";
+    if (savingsGoal > 0) return "You're on track to meet your savings goal. Keep it up!";
+    if (savings >= 0) return "Your finances look healthy. Consider setting a savings goal.";
+    return "You're spending more than you earn. Review your expenses.";
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _getFinancialHealthColor();
+    final icon = _getFinancialHealthIcon();
+    final message = _getFinancialHealthMessage();
+
+    return TweenAnimationBuilder<double>(
+      duration: const Duration(milliseconds: 600),
+      tween: Tween(begin: 0.0, end: 1.0),
+      curve: Curves.easeOut,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.scale(
+            scale: 0.95 + (value * 0.05),
+            child: Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              color: color.withOpacity(0.1),
+              child: ListTile(
+                leading: Icon(icon, color: color),
+                title: const Text("Financial Health"),
+                subtitle: Text(message, style: TextStyle(color: color)),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -362,6 +579,7 @@ class AnimatedDashboardCard extends StatelessWidget {
   final Color color;
   final bool showEdit;
   final VoidCallback? onEdit;
+  final String? subtitle;
 
   const AnimatedDashboardCard({
     super.key,
@@ -371,6 +589,7 @@ class AnimatedDashboardCard extends StatelessWidget {
     required this.color,
     this.showEdit = false,
     this.onEdit,
+    this.subtitle,
   });
 
   @override
@@ -430,6 +649,16 @@ class AnimatedDashboardCard extends StatelessWidget {
                         color: Colors.grey.shade600,
                       ),
                     ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle!,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -475,8 +704,29 @@ class AnimatedQuickActions extends StatelessWidget {
                 ),
               );
             }
-            // Handle other actions
+
+            else if (index == 2 ) {
+              // Navigate to add transaction screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ExpenseDetailedScreen(),
+                ),
+              );
+            }
+
+            else if (index == 3 ) {
+              // Navigate to add transaction screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const IncomeDetailedScreen(),
+                ),
+              );
+            }
+
           },
+
           child: Column(
             children: [
               CircleAvatar(
@@ -497,6 +747,7 @@ class AnimatedQuickActions extends StatelessWidget {
             ],
           ),
         );
+
       },
     );
   }
@@ -664,72 +915,6 @@ class AnimatedTransactionTile extends StatelessWidget {
                 ),
                 title: Text(label),
                 trailing: Text(amount, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-// Animated Financial Health Card
-class AnimatedFinancialHealthCard extends StatelessWidget {
-  final double income;
-  final double budget;
-  final double savingsGoal;
-
-  const AnimatedFinancialHealthCard({
-    super.key,
-    required this.income,
-    required this.budget,
-    required this.savingsGoal,
-  });
-
-  Color _getFinancialHealthColor() {
-    if (income == 0 || budget == 0) return Colors.grey;
-    if (budget > income) return Colors.red;
-    if (savingsGoal > 0 && budget >= savingsGoal) return Colors.green;
-    return Colors.blue;
-  }
-
-  IconData _getFinancialHealthIcon() {
-    if (income == 0 || budget == 0) return Icons.help;
-    if (budget > income) return Icons.warning;
-    if (savingsGoal > 0 && budget >= savingsGoal) return Icons.celebration;
-    return Icons.trending_up;
-  }
-
-  String _getFinancialHealthMessage() {
-    if (income == 0 || budget == 0) return "Complete your profile to see financial health analysis";
-    if (budget > income) return "Your budget exceeds your income. Consider adjusting your spending.";
-    if (savingsGoal > 0 && budget >= savingsGoal) return "Great job! You're meeting your savings goal.";
-    if (savingsGoal > 0) return "You're on track to meet your savings goal. Keep it up!";
-    return "Your finances look healthy. Consider setting a savings goal.";
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _getFinancialHealthColor();
-    final icon = _getFinancialHealthIcon();
-    final message = _getFinancialHealthMessage();
-
-    return TweenAnimationBuilder<double>(
-      duration: const Duration(milliseconds: 600),
-      tween: Tween(begin: 0.0, end: 1.0),
-      curve: Curves.easeOut,
-      builder: (context, value, child) {
-        return Opacity(
-          opacity: value,
-          child: Transform.scale(
-            scale: 0.95 + (value * 0.05),
-            child: Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              color: color.withOpacity(0.1),
-              child: ListTile(
-                leading: Icon(icon, color: color),
-                title: const Text("Financial Health"),
-                subtitle: Text(message, style: TextStyle(color: color)),
               ),
             ),
           ),
