@@ -5,11 +5,18 @@ import '../../../data/models/transactions_model.dart';
 import '../../../data/models/user_models.dart';
 import '../../../state/auth_provider.dart';
 import '../../../state/expense_provider.dart';
+import '../../widgets/charts/expense_pie_chart.dart.dart';
+import '../../widgets/charts/income_expense_comparison.dart';
+import '../../widgets/charts/monthly_trend_chart.dart.dart';
 import '../auth/login_screen.dart';
 import '../auth/profile_setup_screen.dart';
 import '../expense/add_edit_transaction_screen.dart';
 import '../expense/expense_detail_screen.dart';
 import '../income/income_detailed_screen.dart';
+
+// Import the new chart widgets
+
+import 'dashboard_summary.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   static const routePath = '/dashboard';
@@ -20,7 +27,8 @@ class DashboardScreen extends ConsumerStatefulWidget {
   ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTickerProviderStateMixin {
+class _DashboardScreenState extends ConsumerState<DashboardScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
@@ -93,14 +101,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
       }
     }
 
-    // ✅ Use 0.0 instead of 0 to maintain double type
     final userBudget = user.monthlyBudget ?? 0.0;
-    final monthlyIncome = user.monthlyIncome; // Already double, no need to convert
+    final monthlyIncome = user.monthlyIncome;
     final monthlySavingsGoal = user.monthlySavingsGoal ?? 0.0;
 
-    // ✅ Default to 70% of income if no budget set
     final monthlyBudget = userBudget > 0 ? userBudget : totalIncome * 0.7;
-
     final actualIncome = monthlyIncome > 0 ? monthlyIncome : totalIncome;
     final actualSavings = actualIncome - totalExpenses;
     final savingsProgress = monthlySavingsGoal > 0
@@ -119,7 +124,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
       budgetUsage: budgetUsage.toDouble(),
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -176,6 +180,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                 children: [
                   AnimatedProfileCard(user: user),
                   const SizedBox(height: 20),
+
+                  // NEW: Dashboard Summary with real-time data
+                  const DashboardSummary(),
+                  const SizedBox(height: 16),
 
                   // Budget Warning Banner
                   if (financials.budgetUsage >= 0.8)
@@ -253,6 +261,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                   AnimatedQuickActions(),
                   const SizedBox(height: 24),
 
+                  // NEW: Charts Section
+                  const AnimatedSectionTitle(title: "Financial Analytics"),
+                  const SizedBox(height: 16),
+
+                  // Expense Pie Chart
+                  const ExpensePieChart(),
+                  const SizedBox(height: 16),
+
+                  // Monthly Trend Chart
+                  const MonthlyTrendChart(),
+                  const SizedBox(height: 16),
+
+                  // Income vs Expense Comparison
+                  const IncomeExpenseComparison(),
+                  const SizedBox(height: 24),
+
                   if (financials.savingsGoal > 0)
                     AnimatedSavingsProgressCard(
                       currency: user.currency ?? 'PKR',
@@ -304,10 +328,28 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
 
                   if (financials.income == 0 || financials.budget == 0)
                     const AnimatedSetupPrompt(),
+
+                  // NEW: Real-time data info
+                  _buildDataInfo(),
                 ],
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDataInfo() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Text(
+        'All charts update in real-time as you add transactions',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: Colors.grey.shade600,
+          fontSize: 12,
+          fontStyle: FontStyle.italic,
         ),
       ),
     );
@@ -704,9 +746,8 @@ class AnimatedQuickActions extends StatelessWidget {
                 ),
               );
             }
-
-            else if (index == 2 ) {
-              // Navigate to add transaction screen
+            else if (index == 2) {
+              // Navigate to expense details screen
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -714,9 +755,8 @@ class AnimatedQuickActions extends StatelessWidget {
                 ),
               );
             }
-
-            else if (index == 3 ) {
-              // Navigate to add transaction screen
+            else if (index == 3) {
+              // Navigate to income details screen
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -724,9 +764,7 @@ class AnimatedQuickActions extends StatelessWidget {
                 ),
               );
             }
-
           },
-
           child: Column(
             children: [
               CircleAvatar(
@@ -747,7 +785,6 @@ class AnimatedQuickActions extends StatelessWidget {
             ],
           ),
         );
-
       },
     );
   }
